@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>solana-airdrop-skill — Merkle airdrops for the Solana AI Kit</title>
+<meta name="description" content="A Solana AI Kit skill for Merkle-tree token/SOL airdrops — build the tree, publish the root, generate proofs, build on-chain claim txs. Zero-dep pure-Python Keccak-256, 3 real on-chain programs, quantified eval 256/256 vs 0/256.">
+<style>
+  :root{--bg:#0b1020;--bg2:#121a33;--ink:#e8ecf5;--mut:#9aa6c2;--acc:#14f195;--acc2:#9945ff;--bad:#ff5c5c;--ok:#14f195}
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+  a{color:var(--acc);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:980px;margin:0 auto;padding:0 20px}
+  header{padding:64px 0 32px;border-bottom:1px solid #1e2a4a}
+  h1{font-size:34px;margin:0 0 8px;letter-spacing:-.5px}
+  h1 .grad{background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .tag{color:var(--mut);font-size:17px}
+  .badges{margin:18px 0 0;display:flex;gap:8px;flex-wrap:wrap}
+  .b{font-size:13px;border:1px solid #2a3a66;border-radius:6px;padding:4px 10px;color:var(--mut)}
+  .b strong{color:var(--ink)}
+  section{padding:40px 0;border-bottom:1px solid #16213a}
+  h2{font-size:22px;margin:0 0 14px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--bg2);border:1px solid #1e2a4a;border-radius:12px;padding:20px}
+  .card h3{margin:0 0 8px;font-size:17px;color:#fff}
+  .card p{margin:0;color:var(--mut);font-size:15px}
+  code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px}
+  pre{background:#070c1a;border:1px solid #1e2a4a;border-radius:8px;padding:14px;overflow:auto;color:#cdd6ee}
+  .eval{width:100%;border-collapse:collapse;font-size:15px}
+  .eval td,.eval th{padding:8px 12px;text-align:left;border-bottom:1px solid #1e2a4a}
+  .eval th{color:var(--mut);font-weight:600}
+  .eval .ok{color:var(--ok);font-weight:700}
+  .eval .bad{color:var(--bad)}
+  ul{margin:8px 0 0;padding-left:20px;color:var(--mut)}
+  ul li{margin:4px 0}
+  footer{padding:32px 0 64px;color:var(--mut);font-size:14px}
+  .cta{display:inline-block;margin:14px 12px 0 0;padding:10px 18px;border-radius:8px;background:linear-gradient(90deg,var(--acc),var(--acc2));color:#04130c;font-weight:700}
+  .cta.alt{background:#1e2a4a;color:var(--ink);border:1px solid #2a3a66}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1><span class="grad">solana-airdrop-skill</span></h1>
+  <div class="tag">Merkle-tree token/SOL airdrops for the Solana AI Kit — ingest → build tree → publish root → prove → claim.</div>
+  <div class="badges">
+    <span class="b"><strong>19</strong> unit tests</span>
+    <span class="b">eval <strong>256/256</strong> vs <strong>0/256</strong></span>
+    <span class="b"><strong>0-dep</strong> pure-Python Keccak-256</span>
+    <span class="b"><strong>3</strong> real on-chain programs</span>
+    <span class="b"><strong>tsc</strong>-clean</span>
+    <span class="b">MIT</span>
+  </div>
+  <div>
+    <a class="cta" href="https://github.com/yusizer/solana-airdrop-skill">Repo</a>
+    <a class="cta alt" href="https://github.com/yusizer/solana-airdrop-skill/blob/main/docs/EVAL.md">Eval report</a>
+    <a class="cta alt" href="https://github.com/yusizer/solana-airdrop-skill/blob/main/skill/SKILL.md">SKILL.md</a>
+  </div>
+</header>
+
+<section>
+  <h2>The problem</h2>
+  <p style="color:var(--mut);margin:0 0 12px">Merkle airdrops are <strong style="color:var(--ink)">convention-fragile</strong>: one wrong choice — <code>sha256</code> instead of <code>keccak256</code>, big-endian instead of little-endian, a missing <code>0x00</code> byte, or sorted-pair proofs against an index-based on-chain verifier — makes <strong style="color:var(--bad)">100% of claims unverifiable</strong> and bricks the drop after launch. No official Solana package ships a Merkle tree, so every builder hand-rolls the easy-to-get-wrong part.</p>
+  <p style="color:var(--mut);margin:0">This skill gets it right — and proves it with a quantified eval.</p>
+</section>
+
+<section>
+  <h2>What it does</h2>
+  <div class="grid">
+    <div class="card"><h3>Build the drop</h3><p>Ingest recipients, build the Merkle tree with the target program's exact leaf encoding, emit the root + per-recipient proofs. Zero-dep pure-Python Keccak-256 (NIST-KAT-verified) so it runs anywhere, including bare CI.</p></div>
+    <div class="card"><h3>Verify before launch</h3><p><code>verify_all() == N</code> is the non-negotiable gate before the root is published on-chain. A wrong-encoding root is unrecoverable after launch — this gate prevents it.</p></div>
+    <div class="card"><h3>Build claim txs</h3><p>Typed <code>@solana/web3.js</code> instruction builders for <code>initialize</code> and <code>claim</code> — claim-status PDAs, double-claim prevention, for the Solana Foundation template (SOL) and Metaplex mpl-gumdrop (SPL, mainnet). <code>tsc --noEmit</code> clean.</p></div>
+    <div class="card"><h3>Prevent double claims</h3><p>Per-program PDA derivation (<code>["claim", airdrop, claimant]</code> / <code>["ClaimStatus", index, distributor]</code>) so a recipient cannot claim twice — even from a leaked proofs file.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>The eval (the reason to trust it)</h2>
+  <p style="color:var(--mut);margin:0 0 14px">Deterministic, offline, runs in CI. Builds a 256-recipient drop with the <em>correct</em> on-chain encoding, then measures claimable rate with the skill vs a developer without it who reaches for plausible-but-wrong conventions.</p>
+  <table class="eval">
+    <tr><th>builder</th><th>claimable</th><th>rate</th></tr>
+    <tr><td><strong>with_skill</strong></td><td class="ok">256 / 256</td><td class="ok">100%</td></tr>
+    <tr><td>baseline: sha256-not-keccak</td><td class="bad">0 / 256</td><td class="bad">0%</td></tr>
+    <tr><td>baseline: big-endian-amount</td><td class="bad">0 / 256</td><td class="bad">0%</td></tr>
+    <tr><td>baseline: missing-isClaimed byte</td><td class="bad">0 / 256</td><td class="bad">0%</td></tr>
+    <tr><td>baseline: convention-mismatch</td><td class="bad">0 / 256</td><td class="bad">0%</td></tr>
+    <tr><td><strong>tamper guard</strong> (forged claims accepted)</td><td class="ok">0 / 4</td><td class="ok">target 0</td></tr>
+  </table>
+  <p style="color:var(--mut);margin:14px 0 0">The 0% baselines are <strong style="color:var(--ink)">not a strawman</strong> — Merkle verification is cryptographic and binary: one wrong byte makes a proof unverifiable, so a wrong convention bricks the entire drop. That is exactly the failure mode this skill prevents. Full methodology: <a href="https://github.com/yusizer/solana-airdrop-skill/blob/main/docs/EVAL.md">docs/EVAL.md</a>.</p>
+</section>
+
+<section>
+  <h2>Real on-chain fidelity</h2>
+  <ul>
+    <li><strong style="color:var(--ink)">Solana Foundation merkle-airdrop template</strong> (SOL) — leaf <code>keccak256(pubkey‖amt‖0x00)</code>, index-based verify. Devnet program <code>6Gs656…nozT</code> verified via <code>getAccountInfo</code>.</li>
+    <li><strong style="color:var(--ink)">Metaplex mpl-gumdrop</strong> (SPL, mainnet <code>gdrpGjVffourzkdDRrQmySw4aTHr8a3xmQzzxSwFD1a</code>) — OpenZeppelin sorted-pair verify, per-index claim PDA.</li>
+    <li><strong style="color:var(--ink)">SPL-token vault pattern</strong> — bitmap double-claim, ATA vault.</li>
+  </ul>
+  <p style="color:var(--mut);margin:10px 0 0">All program IDs / leaf layouts / npm versions verified against primary sources 2026-06-26. Anything unverified is labeled <code>UNVERIFIED</code> — nothing invented. See <a href="https://github.com/yusizer/solana-airdrop-skill/blob/main/skill/resources.md">skill/resources.md</a>.</p>
+</section>
+
+<section>
+  <h2>Quick start</h2>
+<pre>python examples/build_drop.py recipients.csv \
+    --encoding solana-official --out proofs.json
+# encoding : solana-official (index-based)
+# root     : &lt;32-byte hex&gt;
+# verified : N/N proofs against root</pre>
+<pre># verify before publishing the root
+python -c "import sys; sys.path.insert(0,'examples'); from merkle_tree import AirdropDistribution, MerkleTree; print('ok')"
+
+# run the suite
+python -m unittest tests.test_merkle    # 19 tests
+python tests/test_eval.py               # 256/256 vs 0/256</pre>
+</section>
+
+<footer>
+  <p>A Solana AI Kit skill · MIT · <a href="https://github.com/yusizer/solana-airdrop-skill">github.com/yusizer/solana-airdrop-skill</a> · Path-2 novel submission (no kit skill, seeded idea, or other bounty PR covers Merkle airdrops).</p>
+</footer>
+</div>
+</body>
+</html>

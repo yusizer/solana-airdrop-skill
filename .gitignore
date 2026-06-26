@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+
+# Build / smoke artifacts (generated, do not commit)
+proofs.json
+proofs_*.json
+recipients.csv
+dist/
+build/
+
+# OS / editor
+.DS_Store
+*.log
+.idea/
+.vscode/

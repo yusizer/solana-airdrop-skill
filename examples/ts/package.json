@@ -1,0 +1,16 @@
+{
+  "name": "solana-airdrop-claim-builder",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "On-chain claim/initialize instruction builders for Solana Merkle airdrops (verified program patterns).",
+  "dependencies": {
+    "@solana/web3.js": "^1.98.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

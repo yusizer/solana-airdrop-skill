@@ -1,0 +1,53 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Merkle unit tests (19)
+        run: python -m unittest tests.test_merkle -v
+
+      - name: Quantified eval (with-skill vs baseline)
+        run: python tests/test_eval.py
+
+      - name: Build-drop CLI smoke
+        run: |
+          python -c "import csv,sys; w=csv.writer(open('recipients.csv','w',newline='')); w.writerow(['pubkey','amount']); [w.writerow([bytes([(i*7+3)%256]*32).hex(), 1_000_000*(i+1)]) for i in range(10)]"
+          python examples/build_drop.py recipients.csv --encoding solana-official --out proofs.json
+          test -f proofs.json
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install @solana/kit (typecheck deps)
+        run: |
+          cd examples/ts
+          npm install --silent
+      - name: tsc --noEmit (claim builder)
+        run: |
+          cd examples/ts
+          npx tsc --noEmit
+
+  installer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install.sh dry-run (syntax + structure)
+        run: bash install.sh --dry-run
