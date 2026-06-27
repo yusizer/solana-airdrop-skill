@@ -3,36 +3,46 @@
  *
  * Builds the `initialize` (publish root + fund) and `claim` (recipient proves
  * inclusion + receives tokens) instructions for the REAL Solana program
- * patterns documented in ../../skill/resources.md. Typed, `tsc --noEmit` clean.
+ * patterns documented in ../../skill/resources.md. Typed, `tsc --noEmit` clean,
+ * and using a REAL Keccak-256 + SHA-256 implementation (`@noble/hashes`).
  *
  * Two verified program patterns are covered:
  *   1. Solana Foundation merkle-airdrop template (SOL):
  *        leaf = keccak256(pubkey || amount_le_u64 || 0x00), index-based verify,
  *        claim-status PDA = ["claim", airdrop_state, claimant].
+ *        ix: initialize_airdrop(merkle_root, amount); claim_airdrop(amount, proof, leaf_index).
  *   2. Metaplex mpl-gumdrop (SPL token, mainnet gdrpGjVffourzkdDRrQmySw4aTHr8a3xmQzzxSwFD1a):
  *        leaf = keccak256(0x00 || index_le_u64 || claimant || mint || amount_le_u64),
  *        OpenZeppelin sorted-pair verify, per-index claim PDA.
+ *        ix: claim(claim_bump, index, amount, claimant_secret, proof).
  *
- * Uses @solana/web3.js (1.98.x) — the legacy path also used by Metaplex's
- * mpl-toolbox. A modern @solana/kit + Codama-codegen variant for the official
- * template is shown in ../../skill/resources.md (getClaimAirdropInstruction).
+ * Anchor serialization order = the on-chain argument declaration order, so the
+ * byte layouts below mirror `lib.rs` exactly (verified 2026-06-27). Instruction
+ * discriminators are the first 8 bytes of sha256("global:<ix_name>") (Anchor).
+ *
+ * Uses @solana/web3.js (1.98.x). A modern @solana/kit + Codama-codegen variant
+ * for the official template is shown in ../../skill/resources.md.
  *
  * This module builds instructions; it does NOT sign or send. The user signs.
  */
-
 import {
   PublicKey,
   TransactionInstruction,
   SystemProgram,
-  SYSVAR_RENT_PUBKEY,
   Keypair,
 } from "@solana/web3.js";
+import { keccak_256 } from "@noble/hashes/sha3.js";
+import { sha256 } from "@noble/hashes/sha2.js";
 
 /** Keccak-256 (Solana BPF keccak; the on-chain hash for every verified program). */
-// In production use `@noble/hashes/sha3`'s keccak_256 or `js-sha3`'s keccak_256.
-// A tiny stand-in is declared here so this file typechecks without a crypto dep;
-// replace with the real implementation before sending a transaction.
-export declare function keccak256(data: Uint8Array): Uint8Array;
+export function keccak256(data: Uint8Array): Uint8Array {
+  return keccak_256(data);
+}
+
+/** Anchor instruction discriminator = first 8 bytes of sha256("global:<ix_name>"). */
+function discriminator(ixName: string): Uint8Array {
+  return sha256(new TextEncoder().encode(`global:${ixName}`)).slice(0, 8);
+}
 
 /** 8-byte little-endian u64. */
 function leU64(n: bigint): Uint8Array {
@@ -105,11 +115,10 @@ export function buildInitializeAirdropInstruction(
 ): TransactionInstruction {
   if (args.merkleRoot.length !== 32) throw new Error("merkleRoot must be 32 bytes");
   const [airdropState] = deriveAirdropState(args.programId);
-  // ix discriminator placeholder — a real deploy uses the Anchor discriminator
-  // (first 8 bytes of sha256("global:initialize_airdrop")). Replace with the
-  // generated client's getInitializeAirdropInstruction for a real deployment.
+  // Anchor: initialize_airdrop(merkle_root: [u8;32], amount: u64)
+  //   disc(8) + merkle_root(32) + amount_le_u64(8)
   const data = new Uint8Array(8 + 32 + 8);
-  data.set(new Uint8Array(8), 0); // discriminator (fill from IDL)
+  data.set(discriminator("initialize_airdrop"), 0);
   data.set(args.merkleRoot, 8);
   data.set(leU64(args.totalAmount), 40);
   return new TransactionInstruction({
@@ -136,13 +145,15 @@ export function buildClaimAirdropInstruction(args: ClaimAirdropArgs): Transactio
   const [airdropState] = deriveAirdropState(args.programId);
   const [userClaim] = deriveClaimStatus(args.programId, airdropState, args.claimant.publicKey);
   for (const p of args.proof) if (p.length !== 32) throw new Error("proof elements must be 32 bytes");
-  // data = discriminator(8) + amount(8) + leaf_index(8) + proof_len(4) + proof[32*n]
-  const data = new Uint8Array(8 + 8 + 8 + 4 + 32 * args.proof.length);
+  // Anchor: claim_airdrop(amount: u64, proof: Vec<[u8;32]>, leaf_index: u64)
+  //   disc(8) + amount_le_u64(8) + proof_len_u32(4) + proof(32*n) + leaf_index_le_u64(8)
+  const data = new Uint8Array(8 + 8 + 4 + 32 * args.proof.length + 8);
+  data.set(discriminator("claim_airdrop"), 0);
   data.set(leU64(args.amount), 8);
-  data.set(leU64(args.leafIndex), 16);
   const view = new DataView(data.buffer);
-  view.setUint32(24, args.proof.length, true);
-  for (let i = 0; i < args.proof.length; i++) data.set(args.proof[i], 28 + 32 * i);
+  view.setUint32(16, args.proof.length, true);
+  for (let i = 0; i < args.proof.length; i++) data.set(args.proof[i], 20 + 32 * i);
+  data.set(leU64(args.leafIndex), 20 + 32 * args.proof.length);
   return new TransactionInstruction({
     programId: args.programId,
     keys: [
@@ -184,10 +195,12 @@ export function deriveGumdropClaimStatus(
 export interface GumdropClaimArgs {
   programId: PublicKey;
   distributor: PublicKey;
-  payer: PublicKey; // claimant (signer)
+  payer: PublicKey; // claimant (signer, writable)
+  temporal: PublicKey; // OTP signer (REQUIRED on-chain signer)
   fromTokenAccount: PublicKey; // distributor's vault ATA
   toTokenAccount: PublicKey; // claimant's ATA
   tokenProgram: PublicKey;
+  claimBump: number; // u8 — bump of the distributor PDA
   index: bigint;
   amount: bigint;
   claimantSecret: PublicKey;
@@ -200,13 +213,22 @@ export function buildGumdropClaimInstruction(args: GumdropClaimArgs): Transactio
     args.programId, args.index, args.distributor,
   );
   for (const p of args.proof) if (p.length !== 32) throw new Error("proof elements must be 32 bytes");
-  const data = new Uint8Array(8 + 8 + 8 + 32 + 4 + 32 * args.proof.length);
-  data.set(leU64(args.index), 8);
-  data.set(leU64(args.amount), 16);
-  data.set(args.claimantSecret.toBytes(), 24);
+  if (args.claimBump < 0 || args.claimBump > 255) throw new Error("claimBump must be a u8");
+  // Anchor: claim(claim_bump: u8, index: u64, amount: u64, claimant_secret: Pubkey, proof: Vec<[u8;32]>)
+  //   disc(8) + claim_bump(1) + index_le_u64(8) + amount_le_u64(8) + claimant_secret(32)
+  //         + proof_len_u32(4) + proof(32*n)
+  const data = new Uint8Array(8 + 1 + 8 + 8 + 32 + 4 + 32 * args.proof.length);
+  data.set(discriminator("claim"), 0);
+  data[8] = args.claimBump;
+  data.set(leU64(args.index), 9);
+  data.set(leU64(args.amount), 17);
+  data.set(args.claimantSecret.toBytes(), 25);
   const view = new DataView(data.buffer);
-  view.setUint32(56, args.proof.length, true);
-  for (let i = 0; i < args.proof.length; i++) data.set(args.proof[i], 60 + 32 * i);
+  view.setUint32(57, args.proof.length, true);
+  for (let i = 0; i < args.proof.length; i++) data.set(args.proof[i], 61 + 32 * i);
+  // On-chain Claim accounts (exact order, verified from lib.rs):
+  //   distributor(w) claim_status(w) from(w) to(w) temporal(signer) payer(signer,w)
+  //   system_program token_program   (8 accounts; NO rent)
   return new TransactionInstruction({
     programId: args.programId,
     keys: [
@@ -214,10 +236,10 @@ export function buildGumdropClaimInstruction(args: GumdropClaimArgs): Transactio
       { pubkey: claimStatus, isSigner: false, isWritable: true },
       { pubkey: args.fromTokenAccount, isSigner: false, isWritable: true },
       { pubkey: args.toTokenAccount, isSigner: false, isWritable: true },
+      { pubkey: args.temporal, isSigner: true, isWritable: false },
       { pubkey: args.payer, isSigner: true, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: args.tokenProgram, isSigner: false, isWritable: false },
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
     ],
     data: Buffer.from(data),
   });
@@ -227,13 +249,18 @@ export function buildGumdropClaimInstruction(args: GumdropClaimArgs): Transactio
 // Verify helpers (mirror merkle_tree.py for a TS-side sanity check)
 // ---------------------------------------------------------------------------
 
-/** Index-based Merkle proof verification (Solana Foundation template). */
+/** Index-based Merkle proof verification (Solana Foundation template).
+ *  Rejects out-of-range indices (the on-chain official template shares this
+ *  gap, but as a standalone primitive this must be safe). */
 export function verifyIndexBased(
   root: Uint8Array,
   index: number,
   leaf: Uint8Array,
   proof: Uint8Array[],
 ): boolean {
+  if (!Number.isInteger(index) || index < 0) return false;
+  // index must fit in `proof.length` bits — no high bits allowed
+  if (BigInt(index) >> BigInt(proof.length) !== 0n) return false;
   let acc = leaf;
   let idx = index;
   for (const sibling of proof) {

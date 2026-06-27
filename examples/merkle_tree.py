@@ -134,6 +134,16 @@ def _h(data: bytes, hashf: str) -> bytes:
 
 LEAF_ENCODINGS = ("solana-official", "gumdrop", "spl-vault", "simple")
 
+# Each encoding is bound to exactly ONE on-chain verify mode. Mixing them
+# silently bricks 100% of claims (non-negotiable #2). Enforced in
+# AirdropDistribution.build and build_drop.py.
+ENCODING_MODE = {
+    "solana-official": "index-based",
+    "gumdrop": "sorted-pair",
+    "spl-vault": "index-based",
+    "simple": "index-based",
+}
+
 
 def leaf_hash(
     pubkey: bytes,
@@ -271,6 +281,13 @@ class MerkleTree:
                 acc = _pair(acc, sibling, hashf, mode)
             return acc == root
         idx = index
+        # Reject out-of-range indices: a proof of length L only authenticates
+        # indices in [0, 2^L). Indices with bits above the proof depth must not
+        # verify (without this, index i + 2^L reuses i's proof). The official
+        # on-chain template shares this gap (mitigated there by per-claimant
+        # PDA + claimant-bound leaf); as a standalone primitive we close it.
+        if idx < 0 or idx >= (1 << len(proof)):
+            return False
         for sibling in proof:
             if idx & 1:
                 acc = _h(sibling + acc, hashf)
@@ -297,6 +314,15 @@ class AirdropDistribution:
         mode: str = "index-based",
         mint: bytes | None = None,
     ) -> "AirdropDistribution":
+        if encoding not in ENCODING_MODE:
+            raise ValueError(f"unknown encoding: {encoding} (choose from {LEAF_ENCODINGS})")
+        required_mode = ENCODING_MODE[encoding]
+        if mode != required_mode:
+            raise ValueError(
+                f"encoding '{encoding}' requires mode '{required_mode}' (got '{mode}'). "
+                f"A mismatch silently bricks 100% of claims on-chain. "
+                f"({ENCODING_MODE})"
+            )
         hashf = "sha256" if encoding == "simple" else "keccak256"
         leaves = [
             leaf_hash(pk, amt, encoding, index=i, mint=mint)

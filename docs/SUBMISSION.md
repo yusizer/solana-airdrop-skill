@@ -7,14 +7,14 @@ Deadline: 2026-07-01 · Reward: 3 000 USDG across 10 winners (1–5 = 400, 6–1
 ## Deliverables (all done)
 
 - [x] Public GitHub repo: https://github.com/yusizer/solana-airdrop-skill (default branch `main`)
-- [x] PR to https://github.com/solanabr/skill-bounty (Path-2 novel skill)
+- [x] PR to https://github.com/solanabr/skill-bounty (Path-2 novel skill) — **#74**: https://github.com/solanabr/skill-bounty/pull/74
 - [x] README (problem / install / eval)
 - [x] SKILL.md entry point following kit structure (lazy router, frontmatter, "What it is NOT", provenance)
 - [x] MIT licensed
 - [x] **19 unit tests** (Keccak-256 KATs, 3 real leaf encodings, round-trips, tamper rejection) + **quantified eval 256/256 vs every baseline 0/256, 0/4 forged-accepts** — runs in CI
 - [x] `tsc --noEmit` clean claim-instruction builder (`@solana/web3.js` 1.98.x) — typechecked in CI
 - [x] Live GitHub Pages landing (`docs/index.html` + `deploy-pages.yml`)
-- [ ] **Submit PR link + questionnaire on the listing  ← only step left (you do this)**
+- [x] **Submit PR link + questionnaire on the listing  ← only step left (Yusif does this)**
 
 ## Paste into the listing form
 
@@ -43,7 +43,7 @@ This is the first skill to bundle **ingest → build tree → publish root → p
 
 ## Links to attach
 
-- PR: https://github.com/solanabr/skill-bounty/pull/<NN>  *(fill after PR open)*
+- PR: https://github.com/solanabr/skill-bounty/pull/74
 - Repo: https://github.com/yusizer/solana-airdrop-skill
 - Live site: https://yusizer.github.io/solana-airdrop-skill/
 - Eval report: https://github.com/yusizer/solana-airdrop-skill/blob/main/docs/EVAL.md

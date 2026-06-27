@@ -5,7 +5,7 @@
 
 A production-grade **Solana AI Kit** skill for **Merkle-tree token/SOL airdrops**. It turns a coding agent into an expert airdrop engineer: ingest recipients → build the Merkle tree → publish the root → generate per-recipient proofs → build on-chain claim transactions → prevent double-claims — with **real on-chain program fidelity** (verified against the Solana Foundation template and Metaplex mpl-gumdrop mainnet), a **zero-dependency pure-Python Keccak-256 engine**, and a **quantified eval** (with-skill 256/256 claimable vs every tested baseline 0/256).
 
-> Bounty: "Ship useful agent skills we can add to Solana AI Kit" — Superteam Brasil. This is a **Path-2 (novel) skill**: no existing kit skill, seeded idea, or any of the 63 other bounty PRs covers Merkle airdrop distribution (verified by grepping the full PR list + the kit's 45 sendaifun skills + 18 submodules + 39-entry registry).
+> Bounty: "Ship useful agent skills we can add to Solana AI Kit" — Superteam Brasil. This is a **Path-2 (novel) skill**: no existing kit skill, seeded idea, or any of the other bounty PRs covers Merkle airdrop distribution (verified by grepping the full PR list + the kit's 45 sendaifun skills + 18 submodules + 39-entry registry — 0 collisions).
 
 ## The problem it solves
 
@@ -34,7 +34,8 @@ solana-airdrop-skill/
     EVAL.md             # methodology + results
     SUBMISSION.md       # paste-ready listing answers
     index.html          # live landing page
-  .github/workflows/validate.yml   # tests + eval + typecheck on every push
+  .github/workflows/validate.yml   # tests + eval + typecheck + install on every push
+  .github/workflows/deploy-pages.yml # publish the docs/ landing to GitHub Pages
   install.sh  README.md  LICENSE  CLAUDE.md
 ```
 

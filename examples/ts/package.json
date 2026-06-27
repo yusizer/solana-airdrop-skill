@@ -5,9 +5,11 @@
   "type": "module",
   "description": "On-chain claim/initialize instruction builders for Solana Merkle airdrops (verified program patterns).",
   "dependencies": {
+    "@noble/hashes": "^2.2.0",
     "@solana/web3.js": "^1.98.4"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "typescript": "^5.4.5"
   },
   "scripts": {

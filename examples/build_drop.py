@@ -24,7 +24,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
-from merkle_tree import AirdropDistribution, LEAF_ENCODINGS  # noqa: E402
+from merkle_tree import AirdropDistribution, LEAF_ENCODINGS, ENCODING_MODE  # noqa: E402
 
 
 def parse_pubkey(s: str) -> bytes:
@@ -49,13 +49,25 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Build a Solana Merkle airdrop.")
     ap.add_argument("recipients", help="CSV with columns: pubkey,amount")
     ap.add_argument("--encoding", default="solana-official", choices=LEAF_ENCODINGS)
-    ap.add_argument("--mode", default="index-based",
+    ap.add_argument("--mode", default=None,
                     choices=["index-based", "sorted-pair"],
-                    help="must match the target program's on-chain verifier")
+                    help="verify mode; defaults to the encoding's required mode")
     ap.add_argument("--mint", default=None,
                     help="32-byte mint as hex (required for 'gumdrop')")
     ap.add_argument("--out", default="proofs.json")
     args = ap.parse_args()
+
+    # Enforce the encoding↔mode binding (non-negotiable #2): a mismatch silently
+    # bricks 100% of claims on-chain. The mode defaults to the encoding's
+    # required mode and cannot be overridden to an incompatible value.
+    required_mode = ENCODING_MODE[args.encoding]
+    if args.mode is None:
+        args.mode = required_mode
+    elif args.mode != required_mode:
+        ap.error(
+            f"encoding '{args.encoding}' requires --mode '{required_mode}' "
+            f"(got '{args.mode}'); a mismatch bricks 100% of claims on-chain"
+        )
 
     mint: bytes | None = None
     if args.encoding == "gumdrop":

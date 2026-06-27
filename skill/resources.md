@@ -32,7 +32,7 @@ and `skill/SKILL.md`'s frontmatter `verified:` date — do not author from memor
 
 ### 2. Metaplex mpl-gumdrop (SPL token — MAINNET)
 
-- **Repo:** https://github.com/metaplex-foundation/mpl-gumdrop (pushed 2025-07-20, not archived)
+- **Repo:** https://github.com/metaplex-foundation/mpl-gumdrop (last commit 2025-03-13, not archived)
 - **Program ID:** `gdrpGjVffourzkdDRrQmySw4aTHr8a3xmQzzxSwFD1a` (**mainnet-verified** via `api.mainnet-beta.solana.com` `getAccountInfo`).
 - **Client:** `@metaplex-foundation/mpl-gumdrop` (npm; depends on `@metaplex-foundation/mpl-toolbox`, web3.js-based — NOT `@solana/kit`).
 - **Leaf (token claim, on-chain):** `keccak256(0x00 ‖ index_le_u64 ‖ claimant_secret_32 ‖ mint_32 ‖ amount_le_u64)`. NFT/candy variants add `resource` + `resource_nonce`.
@@ -60,7 +60,7 @@ and `skill/SKILL.md`'s frontmatter `verified:` date — do not author from memor
 | `gill` | 0.14.0 | tx construction (official template scripts) |
 | `js-sha3` | 0.9.3 | `keccak_256` — used by the official template |
 | `@noble/hashes` | (sha3) | `keccak_256` — alternative |
-| `@openzeppelin/merkle-tree` | 1.0.8 | sorted-pair standard (matches gumdrop on-chain) |
+| `@openzeppelin/merkle-tree` | 1.0.8 | sorted-pair standard (same convention as gumdrop's on-chain Rust port of `MerkleProof.sol` v3.4.0 — not the JS lib itself) |
 | `merkletreejs` | 0.6.0 | general tree (sorted & unsorted) |
 
 **No official Solana package ships a Merkle tree** — `@solana/kit`, `@solana/web3.js`, and `@solana/spl-token` were all grepped and contain no merkle code. Devs hand-roll with `js-sha3`/`@noble/hashes`, or use `@openzeppelin/merkle-tree` (for OZ-sorted verifiers like gumdrop). This skill's `examples/merkle_tree.py` is the Python equivalent — zero-dependency, keccak-by-default.

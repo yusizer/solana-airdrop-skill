@@ -46,7 +46,7 @@ credits the claimant. No token program, no mint, no vault ATA.
 | `claim_status` | yes | no | PDA `["ClaimStatus", index_le, distributor]` — per-INDEX, `init` |
 | `from` (vault) | yes | no | distributor's token account (funded) |
 | `to` | yes | no | claimant's token account (ATA) |
-| `temporal` | no | yes | optional OTP signer |
+| `temporal` | no | yes | **required** OTP signer (`Signer<'info>` on-chain — never omit) |
 | `payer` | yes | yes | claimant |
 | `system_program` | no | no | |
 | `token_program` | no | no | SPL Token |

@@ -39,9 +39,19 @@ Four things every leaf must match the on-chain verifier on — get ANY wrong and
 
 ## The tree
 
-Binary, leaves right-padded with a zero-hash to a power of two (index-based
-mode). Parent = `H(left ‖ right)` (index-based) or `H(0x01 ‖ sorted(left,right))`
-(sorted-pair / OpenZeppelin, used by gumdrop). The root is the single top hash.
+Binary, leaves right-padded with a zero-hash to a power of two (applied in
+**both** modes by `merkle_tree.py`). Parent = `H(left ‖ right)` (index-based)
+or `H(0x01 ‖ sorted(left,right))` (sorted-pair / OpenZeppelin, used by
+gumdrop). The root is the single top hash.
+
+> **Interop note:** OpenZeppelin's `StandardMerkleTree` builds a *complete*
+> binary tree (no zero-padding) for non-power-of-two leaf counts. This skill's
+> zero-padded shape therefore matches OZ/gumdrop-CLI **only for N = 2^k**. For
+> N ≠ 2^k the skill is **self-contained**: root + proofs produced by this
+> engine verify on-chain against the same engine's root (the on-chain sorted-
+> pair verifier is shape-agnostic — it walks the proof you give it). Do not mix
+> roots/proofs between this engine and the OZ/gumdrop CLI for N ≠ 2^k; build
+> and verify with the same tool.
 
 - **index-based** (official template, spl-vault): sibling side is decided by
   the leaf index's bits at each level. Proof = ordered sibling hashes + the

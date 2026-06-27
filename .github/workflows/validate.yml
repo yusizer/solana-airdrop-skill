@@ -5,17 +5,18 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+          python-version: "3.12"
 
       - name: Merkle unit tests (19)
         run: python -m unittest tests.test_merkle -v
@@ -23,31 +24,49 @@ jobs:
       - name: Quantified eval (with-skill vs baseline)
         run: python tests/test_eval.py
 
-      - name: Build-drop CLI smoke
+      - name: Build-drop CLI smoke (solana-official + gumdrop)
         run: |
-          python -c "import csv,sys; w=csv.writer(open('recipients.csv','w',newline='')); w.writerow(['pubkey','amount']); [w.writerow([bytes([(i*7+3)%256]*32).hex(), 1_000_000*(i+1)]) for i in range(10)]"
+          python -c "import csv; w=csv.writer(open('recipients.csv','w',newline='')); w.writerow(['pubkey','amount']); [w.writerow([bytes([(i*7+3)%256]*32).hex(), 1_000_000*(i+1)]) for i in range(10)]"
           python examples/build_drop.py recipients.csv --encoding solana-official --out proofs.json
           test -f proofs.json
+          python examples/build_drop.py recipients.csv --encoding gumdrop --mint "$(python -c 'print("aa"*32)')" --out proofs_gum.json
+          test -f proofs_gum.json
 
   typecheck:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
-      - name: Install @solana/kit (typecheck deps)
-        run: |
-          cd examples/ts
-          npm install --silent
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: examples/ts/package-lock.json
+      - name: Install deps (npm ci)
+        working-directory: examples/ts
+        run: npm ci
       - name: tsc --noEmit (claim builder)
-        run: |
-          cd examples/ts
-          npx tsc --noEmit
+        working-directory: examples/ts
+        run: npm run typecheck
 
   installer:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - name: install.sh dry-run (syntax + structure)
-        run: bash install.sh --dry-run
+      - uses: actions/checkout@v6
+      - name: Real install into a temp project + assert flat layout
+        run: |
+          set -e
+          mkdir -p /tmp/proj
+          bash install.sh /tmp/proj
+          # Assert the skill lands where Claude Code discovers it (flat, NOT nested).
+          test -f /tmp/proj/.claude/skills/solana-airdrop/SKILL.md
+          test -f /tmp/proj/.claude/agents/airdrop-planner.md
+          test -f /tmp/proj/.claude/commands/airdrop-design.md
+          test -f /tmp/proj/.claude/rules/verify-before-launch.md
+          test -f /tmp/proj/solana-airdrop/examples/merkle_tree.py
+          test -f /tmp/proj/solana-airdrop/tests/test_merkle.py
+          # Negative: the old nesting bug would create these — they must NOT exist.
+          ! test -d /tmp/proj/.claude/agents/agents
+          ! test -d /tmp/proj/.claude/skills/solana-airdrop/skill
+          echo "install layout OK (flat, no nesting)"
