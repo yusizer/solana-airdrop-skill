@@ -34,18 +34,23 @@ if [ ! -d "$TARGET" ]; then
   exit 1
 fi
 
-copy() {  # copy <src-dir> <dst-dir> — copies the CONTENTS of src into dst
+copy() {  # copy <src> <dst> — dirs: copy CONTENTS into dst; files: copy to dst
   if [ $DRY_RUN = 1 ]; then
-    echo "  would copy  $1/* -> $2/"
-  else
-    mkdir -p "$2"
+    echo "  would copy  $1 -> $2"
+    return
+  fi
+  if [ -d "$1" ]; then
     # Copy the *contents* of $1 (with "$1/.") into $2 — NOT $1 itself. Using
     # `cp -r "$1" "$2"` would nest: $2/<basename-of-$1>/...  which puts SKILL.md
     # at .claude/skills/solana-airdrop/skill/SKILL.md (undetectable by Claude
     # Code) instead of .claude/skills/solana-airdrop/SKILL.md.
+    mkdir -p "$2"
     cp -r "$1/." "$2/"
-    echo "  copied      $1/* -> $2/"
+  else
+    mkdir -p "$(dirname "$2")"
+    cp "$1" "$2"
   fi
+  echo "  copied      $1 -> $2"
 }
 
 CLAUDE_DIR="$TARGET/.claude"
